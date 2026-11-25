@@ -12,7 +12,7 @@ import { useGame } from '../store';
 type Overlay = null | { kind: 'floor'; last: boolean } | { kind: 'pause' } | { kind: 'death'; cause: string };
 
 export function HuntView() {
-  const { s, act, go, toast, slot } = useGame();
+  const { s, act, go, toast, slot, ask } = useGame();
   const ref = useRef<HTMLCanvasElement>(null);
   const hunt = useRef<Hunt | null>(null);
   const [overlay, setOverlay] = useState<Overlay>(null);
@@ -68,7 +68,7 @@ export function HuntView() {
           <RunSummary />
           <div className="mt-4 flex flex-col gap-2">
             <Btn variant="primary" onClick={() => { setOverlay(null); hunt.current?.setPaused(false); }}>Resume</Btn>
-            <Btn onClick={() => { if (confirm('Flee to the Haven? You keep what you carry, but this floor is abandoned.')) leave(); }}>Flee to the Haven</Btn>
+            <Btn onClick={() => { ask('Flee to the Haven? You keep what you carry, but this floor is abandoned.', () => { leave(); }); }}>Flee to the Haven</Btn>
           </div>
           <Controls />
         </Modal>

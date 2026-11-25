@@ -19,6 +19,10 @@ interface Store {
   act: (fn: (s: GameState) => string | string[] | void | { msg: string; ok: boolean }) => void;
   toast: (text: string | string[], tone?: Toast['tone']) => void;
   dismiss: (id: number) => void;
+  /** In-game confirmation (the artifact viewer blocks window.confirm). */
+  ask: (text: string, onYes: () => void) => void;
+  pending: { text: string; onYes: () => void } | null;
+  resolve: (yes: boolean) => void;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -33,6 +37,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [screen, setScreen] = useState<Screen>('title');
   const [version, setVersion] = useState(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [pending, setPending] = useState<{ text: string; onYes: () => void } | null>(null);
   const ref = useRef<{ s: GameState | null; slot: number }>({ s: null, slot: 0 });
 
   const toast = useCallback((text: string | string[], tone?: Toast['tone']) => {
@@ -63,7 +68,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => ({
     s, slot, screen, version, toasts, setGame, go: setScreen, act, toast, dismiss: (id) => setToasts((o) => o.filter((x) => x.id !== id)),
-  }), [s, slot, screen, version, toasts, setGame, act, toast]);
+    ask: (text, onYes) => setPending({ text, onYes }), pending, resolve: (yes) => { const p = pending; setPending(null); if (yes) p?.onYes(); },
+  }), [s, slot, screen, version, toasts, setGame, act, toast, pending]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

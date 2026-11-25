@@ -43,7 +43,7 @@ const ATTR_DESC: Record<PrimaryStat, string> = {
 const ATTR_CAP = (rank: number) => 20 + rank * 6;
 
 function Attributes() {
-  const { s, act } = useGame();
+  const { s, act, ask } = useGame();
   const st = computeStats(s);
   const h = s.heir;
   const [showSrc, setShowSrc] = useState(false);
@@ -90,7 +90,7 @@ function Attributes() {
                 <p className="mt-1 text-xs text-mist">{p.description}</p>
                 <div className="mt-1 text-xs text-gold">Per rank:</div><Mods mods={p.perRank} className="!text-xs" />
                 <div className="mt-1 text-xs text-amber-200">{p.capstone.name}: {p.capstone.text}</div>
-                <Btn small className="mt-2 w-full" onClick={() => { if (confirm(`Walk the ${p.name}? This choice is permanent for ${h.name}.`)) act((g) => { g.heir.path = p.id; return `${g.heir.name} walks the ${p.name}.`; }); }}>Choose</Btn>
+                <Btn small className="mt-2 w-full" onClick={() => { ask(`Walk the ${p.name}? This choice is permanent for ${h.name}.`, () => { act((g) => { g.heir.path = p.id; return `${g.heir.name} walks the ${p.name}.`; }); }); }}>Choose</Btn>
               </div>
             ))}
           </div>
@@ -111,7 +111,7 @@ function Attributes() {
 }
 
 function Bloodline() {
-  const { s, act } = useGame();
+  const { s, act, ask } = useGame();
   const h = s.heir;
   const ex = expressedGenes(h.genome);
   const fus = activeFusions(h.genome, h.stages);
@@ -178,7 +178,7 @@ const SCHOOLS: Array<{ id: AbilitySchool | 'bloodline' | 'house'; name: string; 
 ];
 
 function Powers() {
-  const { s, act } = useGame();
+  const { s, act, ask } = useGame();
   const h = s.heir;
   const [school, setSchool] = useState<(typeof SCHOOLS)[number]['id']>('blood');
   const [pick, setPick] = useState<AbilityDef | null>(null);
@@ -237,7 +237,7 @@ function Powers() {
 
 import { Modal } from '../components';
 function AbilityModal({ a, onClose }: { a: AbilityDef; onClose: () => void }) {
-  const { s, act } = useGame();
+  const { s, act, ask } = useGame();
   const h = s.heir;
   const st = abilityStatus(s, a);
   const lvl = masteryLevel(h, a.id);
@@ -270,7 +270,7 @@ function AbilityModal({ a, onClose }: { a: AbilityDef; onClose: () => void }) {
 }
 
 function Armory() {
-  const { s, act } = useGame();
+  const { s, act, ask } = useGame();
   const h = s.heir;
   const [filter, setFilter] = useState<string>('all');
   const equip = (uid: string) => act((g) => {
@@ -328,7 +328,7 @@ function Armory() {
 }
 
 function UpgradeBtn({ uid }: { uid: string }) {
-  const { s, act } = useGame();
+  const { s, act, ask } = useGame();
   const it = s.inventory.find((x) => x.uid === uid) ?? Object.values(s.heir.equipment).find((x) => x?.uid === uid);
   if (!it || it.level >= 10) return null;
   const c = upgradeCost(it);
@@ -365,11 +365,11 @@ function Lineage() {
 
 import { generateProgeny } from '../../game/systems/progression';
 function EndReign() {
-  const { s, act, go } = useGame();
+  const { s, act, go, ask } = useGame();
   return (
     <Panel title="The Long Sleep" icon="coffin">
       <p className="text-sm text-mist">An heir may choose to enter the Long Sleep and pass the mantle on. Their equipment and part of their mastery pass to the next generation. {s.heir.spouse ? `With ${s.heir.spouse.name}, the Rite of Commingling will produce three candidates.` : 'Without a spouse, only a lesser Embrace is possible. Arrange a marriage at Court first.'}</p>
-      <Btn className="mt-2" onClick={() => { if (confirm(`Let ${s.heir.name} enter the Long Sleep?`)) { act((g) => { g.progeny = generateProgeny(g); }); go('succession'); } }}>Enter the Long Sleep</Btn>
+      <Btn className="mt-2" onClick={() => { ask(`Let ${s.heir.name} enter the Long Sleep?`, () => { { act((g) => { g.progeny = generateProgeny(g); }); go('succession'); } }); }}>Enter the Long Sleep</Btn>
     </Panel>
   );
 }

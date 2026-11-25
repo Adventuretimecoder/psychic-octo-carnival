@@ -16,12 +16,15 @@
   --font-fell: 'IM Fell English', serif;
 }
 
+@layer base {
 :root { color-scheme: dark; }
 html, body, #root { height: 100%; margin: 0; background: #0b0709; color: #e8dcc8; overscroll-behavior: none; }
 body { font-family: var(--font-body); font-size: 17px; -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; }
 * { scrollbar-width: thin; scrollbar-color: #4a2a30 transparent; }
 button { cursor: pointer; font: inherit; color: inherit; }
 button:disabled { cursor: not-allowed; }
+
+}
 
 .bg-haven {
   background:
@@ -81,5 +84,7 @@ button:disabled { cursor: not-allowed; }
 
 .safe-b { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
 .safe-t { padding-top: max(0.25rem, env(safe-area-inset-top)); }
+@layer base {
 input, textarea, select { background: #120b0e; border: 1px solid rgba(212, 168, 74, 0.35); border-radius: 4px; padding: 0.5rem 0.7rem; color: #f0e0c8; font-family: var(--font-body); font-size: 1rem; }
 input:focus, textarea:focus, select:focus { outline: none; border-color: #e8bc60; box-shadow: 0 0 10px rgba(212, 168, 74, 0.25); }
+}

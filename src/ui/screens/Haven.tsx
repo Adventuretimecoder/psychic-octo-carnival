@@ -94,7 +94,7 @@ function TopBar({ onSettings }: { onSettings: () => void }) {
 }
 
 function Overview({ go }: { go: (t: Tab) => void }) {
-  const { s, act } = useGame();
+  const { s, act, ask } = useGame();
   const [npc, setNpc] = useState<NpcDef | null>(null);
   const [choice, setChoice] = useState<QuestDef['choice'] | null>(null);
   const [sub, setSub] = useState<'hall' | 'alchemy'>('hall');
@@ -157,7 +157,7 @@ function Overview({ go }: { go: (t: Tab) => void }) {
       <div className="grid grid-cols-2 gap-2">
         <Btn onClick={() => setSub('alchemy')} className="flex items-center justify-center gap-2"><Icon name="bubbling-flask" size={18} /> Laboratory & Market</Btn>
         <Btn onClick={() => go('hunt')} variant="primary" className="flex items-center justify-center gap-2"><Icon name="fangs" size={18} /> Go Hunting</Btn>
-        <Btn variant="ghost" className="col-span-2" onClick={() => { if (confirm('Rest until the next night? Your domains yield income and the world moves on.')) act((g) => advanceNight(g)); }}>Rest until the next night</Btn>
+        <Btn variant="ghost" className="col-span-2" onClick={() => { ask('Rest until the next night? Your domains yield income and the world moves on.', () => { act((g) => advanceNight(g)); }); }}>Rest until the next night</Btn>
       </div>
 
       <Panel title="Chronicle of the Night" icon="tied-scroll">
@@ -187,7 +187,7 @@ function lineOk(s: GameState, r?: NpcDef['lines'][number]['requires'], npcId?: s
 }
 
 function NpcDialog({ npc, onClose }: { npc: NpcDef; onClose: () => void }) {
-  const { s, act } = useGame();
+  const { s, act, ask } = useGame();
   const rel = s.npcs[npc.id] ?? 0;
   const tier = [...npc.tiers].reverse().find((t) => rel >= t.min) ?? npc.tiers[0];
   const [greet] = useState(() => tier.greeting[Math.floor(Math.random() * tier.greeting.length)]);

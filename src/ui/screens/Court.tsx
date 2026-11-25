@@ -60,7 +60,7 @@ function Houses() {
 }
 
 function HouseDetail({ id }: { id: HouseId }) {
-  const { s, act } = useGame();
+  const { s, act, ask } = useGame();
   const h = HOUSE_BY_ID[id];
   const hs = s.houses[id];
   const sp = spouseCandidate(s, id);
@@ -93,7 +93,7 @@ function HouseDetail({ id }: { id: HouseId }) {
         <Btn small onClick={() => act((g) => espionage(g, id))} disabled={hs.secretKnown}>Espionage</Btn>
         {hs.secretKnown && <Btn small onClick={() => act((g) => blackmail(g, id))}>Blackmail</Btn>}
         {hs.secretKnown && <Btn small onClick={() => act((g) => denounce(g, id))}>Denounce</Btn>}
-        {!hs.alliance ? <Btn small onClick={() => act((g) => proposeAlliance(g, id))}>Propose alliance</Btn> : <Btn small variant="ghost" onClick={() => { if (confirm('Betray this alliance?')) act((g) => breakAlliance(g, id)); }}>Break alliance</Btn>}
+        {!hs.alliance ? <Btn small onClick={() => act((g) => proposeAlliance(g, id))}>Propose alliance</Btn> : <Btn small variant="ghost" onClick={() => { ask('Betray this alliance?', () => { act((g) => breakAlliance(g, id)); }); }}>Break alliance</Btn>}
       </div>
       {!s.heir.spouse && (
         <div className="mt-3 rounded border border-pink-300/20 bg-black/30 p-2.5">
@@ -109,7 +109,7 @@ function HouseDetail({ id }: { id: HouseId }) {
 }
 
 function Council() {
-  const { s, act } = useGame();
+  const { s, act, ask } = useGame();
   const seated = s.council.seats.includes('player');
   const throne = s.council.throne === 'player' ? `${s.heir.name} of House ${s.dynasty.name}` : s.counters['boss:gilded-regent'] ? 'Empty — the Regent is fallen' : 'The Gilded Regent (in the Sovereign\'s name)';
   return (
@@ -148,7 +148,7 @@ function Council() {
 }
 
 function Domains() {
-  const { s, act } = useGame();
+  const { s, act, ask } = useGame();
   const owned = Object.entries(s.regions).filter(([, r]) => r.owner === 'player');
   return (
     <div className="space-y-3">

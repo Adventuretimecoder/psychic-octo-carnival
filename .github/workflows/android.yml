@@ -1,0 +1,58 @@
+name: Android APK
+
+# Builds an installable Android APK on every push and publishes it as a GitHub Release.
+on:
+  push:
+    branches: ['**']
+    paths-ignore: ['docs/**', '**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install
+        run: npm ci
+      - name: Test
+        run: npm test
+      - name: Build web game
+        run: npm run build
+      - name: Create Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+      - name: Lock to fullscreen immersive look
+        run: |
+          sed -i 's/<activity/<activity android:screenOrientation="fullUser"/' android/app/src/main/AndroidManifest.xml
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Sanguinis.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sanguinis-apk
+          path: Sanguinis.apk
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: Sanguinis (Android) build ${{ github.run_number }}
+          body: |
+            Download **Sanguinis.apk** below on your Android phone and open it.
+            If Android asks, allow your browser to "Install unknown apps".
+            Built from ${{ github.ref_name }} @ ${{ github.sha }}.
+          files: Sanguinis.apk
+          make_latest: true

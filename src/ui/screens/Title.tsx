@@ -63,7 +63,7 @@ function TitleBackdrop() {
 }
 
 export function Title() {
-  const { setGame, go, toast } = useStore();
+  const { setGame, go, toast, ask } = useStore();
   const [list, setList] = useState(slots());
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -105,7 +105,7 @@ export function Title() {
                   {x ? <><div className="font-display text-parch">House {x.name}</div><div className="text-xs text-mist">{x.heir} · Gen {x.generation} · Rank {x.rank} · Night {x.night}</div></> : <div className="italic text-mist">Empty slot</div>}
                 </div>
                 {x && <Btn small onClick={() => start(i)}>Load</Btn>}
-                {x && <Btn small variant="ghost" onClick={() => { if (confirm(`Erase House ${x.name} forever?`)) { deleteSlot(i); setList(slots()); } }}>✕</Btn>}
+                {x && <Btn small variant="ghost" onClick={() => { ask(`Erase House ${x.name} forever?`, () => { { deleteSlot(i); setList(slots()); } }); }}>✕</Btn>}
               </div>
             ))}
           </div>
