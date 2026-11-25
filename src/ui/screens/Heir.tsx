@@ -204,7 +204,7 @@ function Powers() {
           <div className="mb-1 font-display text-xs text-gold">Transformation</div>
           <div className="flex flex-wrap gap-1.5">
             {FORMS.map((f) => {
-              const ok = formAvailable(h, f);
+              const ok = formAvailable(h, f, !!s.dev?.enabled && s.dev.allForms);
               return <button key={f.id} disabled={!ok} title={f.description} onClick={() => act((g) => { g.heir.form = f.id; })} className={`flex items-center gap-1 rounded border px-2 py-1 text-xs ${h.form === f.id ? 'border-ember bg-blood/50 text-parch' : ok ? 'border-gold/25 text-parch' : 'border-gold/10 text-mist/40'}`}><Icon name={f.icon} size={14} color={ok ? f.color : '#555'} />{f.name}</button>;
             })}
           </div>

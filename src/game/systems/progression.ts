@@ -264,7 +264,8 @@ export function resolveAbility(def: AbilityDef, heir: Heir): { name: string; par
 }
 
 // ───────────────────────── Forms ─────────────────────────
-export function formAvailable(heir: Heir, f: FormDef): boolean {
+export function formAvailable(heir: Heir, f: FormDef, devAll = false): boolean {
+  if (devAll) return true;
   const check = (r: FormDef['requirement']): boolean => {
     switch (r.type) {
       case 'start': return true;

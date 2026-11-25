@@ -5,7 +5,7 @@
  */
 import { ICON_PATHS } from '../../assets/icons.generated';
 import { ABILITY_BY_ID, BOSS_BY_ID, CREATURE_BY_ID, FORM_BY_ID, ITEM_BY_ID, REGION_BY_ID } from '../data';
-import type { GameState } from '../state';
+import { DEFAULT_DEV, type DevFlags, type GameState } from '../state';
 import { itemEffects, makeInstance, rollEquipment, rollMaterial, RARITY_COLOR, weaponDamage } from '../systems/loot';
 import { formAvailable, masteryLevel, resolveAbility } from '../systems/progression';
 import { chance, makeRng, pick, type Rng } from '../systems/rng';
@@ -178,6 +178,10 @@ export class Hunt {
   private held = new Map<number, string>(); // touch id → button id
   private buttons: Button[] = [];
   private paused = false;
+
+  /** Developer flags (all off unless developer mode is enabled). */
+  private get dv(): DevFlags { const d = this.cfg.state.dev; return d?.enabled ? d : DEFAULT_DEV; }
+  private fpsAcc = { t: 0, n: 0, fps: 0 };
 
   constructor(canvas: HTMLCanvasElement, cfg: HuntConfig) {
     this.cv = canvas;
@@ -373,6 +377,8 @@ export class Hunt {
     let dt = Math.min(0.05, (now - this.lastT) / 1000);
     this.lastT = now;
     if (this.paused) dt = 0;
+    this.fpsAcc.t += dt; this.fpsAcc.n++; if (this.fpsAcc.t >= 0.5) { this.fpsAcc.fps = Math.round(this.fpsAcc.n / this.fpsAcc.t); this.fpsAcc.t = 0; this.fpsAcc.n = 0; }
+    dt *= this.dv.timeScale;
     if (this.hitstop > 0) { this.hitstop -= dt; dt *= 0.08; }
     if (dt > 0) this.update(dt);
     this.render();
@@ -413,7 +419,10 @@ export class Hunt {
     if (p.comboT <= 0) p.combo = 0;
     this.comboT -= dt;
     if (this.comboT <= 0 && this.combo) { if (this.combo > this.maxCombo) this.maxCombo = this.combo; this.combo = 0; }
-    for (const a of this.abilities) if (a) a.cd = Math.max(0, a.cd - dt * st.cooldownRate);
+    for (const a of this.abilities) if (a) a.cd = this.dv.noCooldowns ? 0 : Math.max(0, a.cd - dt * st.cooldownRate);
+    if (this.dv.noCooldowns) { p.dashCd = Math.min(p.dashCd, 0.1); p.formCd = 0; }
+    if (this.dv.infBlood) p.blood = st.maxBlood;
+    if (this.dv.god) p.hp = Math.max(p.hp, st.maxHp);
     if (p.shieldT > 0) { p.shieldT -= dt; if (p.shieldT <= 0) p.shield = 0; }
 
     // Form
@@ -425,7 +434,7 @@ export class Hunt {
     }
 
     // Hunger
-    const hunger = 0.32 * st.hungerRate;
+    const hunger = this.dv.noHunger || this.dv.infBlood ? 0 : 0.32 * st.hungerRate;
     p.blood = Math.max(0, p.blood - hunger * dt);
     if (p.blood <= 0.5) {
       p.starveT += dt;
@@ -464,8 +473,8 @@ export class Hunt {
       }
       if (p.dashT <= 0 && this.effects.has('dash-nova')) this.novaAt(p.x, p.y, 70, this.weaponDmg * 1.2 * st.bloodDmg, 'blood', '#ff2a45');
     } else if (!p.feeding) {
-      const sp = 150 * st.moveSpeed;
-      this.moveEnt(p, mx * sp * dt, my * sp * dt, false);
+      const sp = 150 * st.moveSpeed * this.dv.speedMul;
+      this.moveEnt(p, mx * sp * dt, my * sp * dt, this.dv.noclip);
     }
 
     // Aim & attack
@@ -484,7 +493,7 @@ export class Hunt {
     // Sunlight
     let inSun = false;
     for (const s of this.floor.sun) { const r = s.r * (0.85 + Math.sin(this.time * 0.6 + s.phase) * 0.15); if (Math.hypot(p.x - s.x, p.y - s.y) < r) inSun = true; }
-    if (inSun && !(p.form && FORM_BY_ID[p.form].flags.includes('flying') && false)) {
+    if (inSun && !this.dv.noSun && !this.dv.god) {
       const mult = (p.form === 'shadow' ? 2 : 1) * (this.effects.has('sun-ward') ? 0.4 : 1) * (1 - st.sunResist);
       if (mult > 0) {
         p.hp -= st.maxHp * 0.11 * mult * dt;
@@ -651,7 +660,7 @@ export class Hunt {
     const p = this.p, heir = this.cfg.state.heir;
     if (p.form) { this.endForm(); return; }
     const f = FORM_BY_ID[heir.form];
-    if (!f || !formAvailable(heir, f)) { audio.play('deny'); return; }
+    if (!f || !formAvailable(heir, f, this.dv.allForms)) { audio.play('deny'); return; }
     if (p.formCd > 0) { audio.play('deny'); return; }
     if (p.blood < 8 && f.upkeep > 0) { audio.play('deny'); this.say('Not enough blood.', '#ff6070'); return; }
     p.form = f.id; p.formT = f.duration || 9999; this.statsDirty = true;
@@ -699,7 +708,7 @@ export class Hunt {
     if (slot.cd > 0) { audio.play('deny'); return; }
     const pr = slot.params;
     const cost = (pr.cost ?? 0) * st.costMult * (p.form === 'wolf' && slot.def.school !== 'physical' ? 1.5 : 1);
-    if (p.blood < cost) { audio.play('deny'); this.say('Not enough blood!', '#ff4060'); return; }
+    if (p.blood < cost && !this.dv.infBlood) { audio.play('deny'); this.say('Not enough blood!', '#ff4060'); return; }
     if (p.form === 'human') this.endForm();
     p.blood -= cost;
     slot.cd = pr.cooldown ?? 1;
@@ -861,7 +870,8 @@ export class Hunt {
     const stealthBonus = !e.aware && st.stealth > 0.2 ? 1.5 : 1;
     const crit = !o.noCrit && Math.random() < st.critChance + (stealthBonus > 1 ? 0.3 : 0);
     let dmg = base * mult * stealthBonus * (crit ? st.critMult : 1) * (1 - armorReduction(e.armor)) * (0.92 + Math.random() * 0.16);
-    dmg = Math.max(1, dmg);
+    dmg = Math.max(1, dmg) * this.dv.dmgMul;
+    if (this.dv.oneHit) dmg = Math.max(dmg, e.hp + 1);
     e.hp -= dmg;
     e.flash = 0.1;
     e.aware = true;
@@ -934,7 +944,7 @@ export class Hunt {
     if (this.effects.has('cooldown-on-kill')) for (const a of this.abilities) if (a) a.cd = Math.max(0, a.cd - 0.5);
     if (e.boss) { this.onBossKilled(e); return; }
     const def = e.def as CreatureDef;
-    const xp = def.xp * (1 + (this.level - 1) * 0.35) * (e.elite ? 2.5 : 1) * this.mods.xp;
+    const xp = def.xp * (1 + (this.level - 1) * 0.35) * (e.elite ? 2.5 : 1) * this.mods.xp * this.dv.xpMul;
     this.cfg.onEvent({ type: 'kill', creature: def.id, family: def.family, elite: e.elite, xp, tags: [...def.tags, def.family, ...(e.elite ? ['elite'] : [])] });
     if (!fed) this.dropLoot(e);
     else if (Math.random() < 0.5) this.dropLoot(e);
@@ -948,7 +958,7 @@ export class Hunt {
       this.spawnPickup(e.x, e.y, 'gold', amt);
     }
     for (const d of def.drops) if (Math.random() < d.chance * (e.elite ? 1.8 : 1) * Math.min(2, st.lootLuck)) this.spawnPickup(e.x, e.y, 'material', 1, d.id);
-    if (Math.random() < (e.elite ? 0.35 : 0.028) * st.lootLuck) this.spawnPickup(e.x, e.y, 'item', 1, undefined, rollEquipment(rng, this.level, st.lootLuck, e.elite ? 'uncommon' : 'common'));
+    if (Math.random() < (e.elite ? 0.35 : 0.028) * st.lootLuck * this.dv.lootMul) this.spawnPickup(e.x, e.y, 'item', 1, undefined, rollEquipment(rng, this.level, st.lootLuck, e.elite ? 'uncommon' : 'common'));
     if (Math.random() < 0.035) this.spawnPickup(e.x, e.y, 'consumable', 1, Math.random() < 0.6 ? 'potion-crimson' : 'potion-vitae');
   }
 
@@ -960,7 +970,7 @@ export class Hunt {
 
   private damagePlayer(dmg: number, element: Element, source: string) {
     const p = this.p, st = this.stats;
-    if (p.hp <= 0 || p.iframes > 0) return;
+    if (p.hp <= 0 || p.iframes > 0 || this.dv.god) return;
     if (p.form === 'mist' && element === 'physical') return;
     let d = dmg * (1 - armorReduction(st.armor)) * (1 - (st[`res_${element}`] ?? 0));
     if (p.form === 'bat') d *= 1.25;
@@ -1071,7 +1081,7 @@ export class Hunt {
     audio.play('levelup');
     for (const x of this.enemies) if (!x.dead) { x.dead = true; this.decal(x.x, x.y, x.r, '#3a0010'); }
     const perfect = this.p.dmgTaken < this.stats.maxHp * 0.15;
-    this.cfg.onEvent({ type: 'boss', boss: def.id, perfect, xp: def.xp * this.mods.xp });
+    this.cfg.onEvent({ type: 'boss', boss: def.id, perfect, xp: def.xp * this.mods.xp * this.dv.xpMul });
     for (const d of def.drops) if (Math.random() < d.chance) {
       if (ITEM_BY_ID[d.id]) this.spawnPickup(e.x, e.y, 'item', 1, undefined, makeInstance(d.id, this.rng));
       else this.spawnPickup(e.x, e.y, 'material', 1 + Math.floor(Math.random() * 2), d.id);
@@ -1086,7 +1096,7 @@ export class Hunt {
   // ───────────────────────── Enemy AI ─────────────────────────
   private updateEnemies(dt: number) {
     const p = this.p, st = this.stats;
-    const awareR = 300 * (1 - st.stealth * 0.8) * (p.form === 'human' ? 0.3 : 1);
+    const awareR = this.dv.invisible ? 0 : 300 * (1 - st.stealth * 0.8) * (p.form === 'human' ? 0.3 : 1);
     for (const e of this.enemies) {
       if (e.dead) continue;
       e.t += dt; e.flash -= dt;
@@ -1111,6 +1121,7 @@ export class Hunt {
       if (e.boss) { this.updateBoss(e, dt); continue; }
 
       const dx = p.x - e.x, dy = p.y - e.y, dist = Math.hypot(dx, dy);
+      if (this.dv.invisible && e.charmT <= 0) { e.aware = false; if (e.ai !== 'feeding') e.ai = 'idle'; }
       if (!e.aware && dist < awareR && hasLOS(this.floor, e.x, e.y, p.x, p.y)) { e.aware = true; e.ai = 'move'; }
       if (!e.aware) { e.alpha = e.behavior === 'stalker' ? 0.08 : 1; continue; }
       if (p.hp <= 0) continue;
@@ -1625,6 +1636,95 @@ export class Hunt {
   private say(text: string, color: string, big = false) { this.messages.push({ text, t: big ? 3 : 2.4, color, big }); if (this.messages.length > 5) this.messages.shift(); }
   private loot(text: string, color: string) { this.lootFeed.push({ text, t: 3.5, color }); if (this.lootFeed.length > 5) this.lootFeed.shift(); }
 
+  // ───────────────────────── Developer actions ─────────────────────────
+  /** Re-read the heir (abilities, gear, stats) after the dev panel changed it mid-hunt. */
+  devRefresh() {
+    const heir = this.cfg.state.heir;
+    const w = heir.equipment.weapon;
+    this.weaponType = w ? (ITEM_BY_ID[w.templateId]?.weaponType ?? 'claws') : 'none';
+    this.weapon = WEAPONS[this.weaponType];
+    this.weaponDmg = weaponDamage(w);
+    this.weaponElement = (w && ITEM_BY_ID[w.templateId]?.element) || 'physical';
+    this.effects = itemEffects(heir);
+    this.abilities = heir.equipped.map((id) => {
+      const def = id ? ABILITY_BY_ID[id] : undefined;
+      if (!def) return null;
+      const r = resolveAbility(def, heir);
+      return { def, name: r.name, params: r.params, element: r.element, cd: 0 };
+    });
+    this.statsDirty = true;
+    this.recalc();
+    this.layoutButtons();
+  }
+  devSpawn(id: string, n = 1, elite = false) {
+    const def = CREATURE_BY_ID[id];
+    if (!def) return;
+    const room = roomAt(this.floor, this.p.x, this.p.y);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, d = 90 + Math.random() * 80;
+      let x = this.p.x + Math.cos(a) * d, y = this.p.y + Math.sin(a) * d;
+      if (isSolid(this.floor, x, y)) { x = this.p.x + Math.cos(a) * 40; y = this.p.y + Math.sin(a) * 40; }
+      const e = this.spawnEnemy(def, x, y, room?.id ?? 0, elite);
+      e.aware = true;
+    }
+    this.say(`${n}× ${def.name} summoned`, '#80c0ff');
+  }
+  devSpawnBoss(id: string) {
+    const def = BOSS_BY_ID[id];
+    if (!def || (this.bossEnt && !this.bossEnt.dead)) return;
+    const room = roomAt(this.floor, this.p.x, this.p.y);
+    const x = this.p.x, y = this.p.y - 140;
+    const e: Enemy = {
+      id: NEXT_ID++, x: isSolid(this.floor, x, y) ? this.p.x + 60 : x, y: isSolid(this.floor, x, y) ? this.p.y : y, vx: 0, vy: 0, r: def.look.size, hp: def.hp * this.mods.hp, maxHp: def.hp * this.mods.hp, facing: Math.PI / 2, t: 0, flash: 0, status: {}, dead: false,
+      def, boss: true, behavior: 'boss', dmg: def.damage * this.mods.dmg, speed: def.speed, armor: def.armor,
+      ai: 'spawn', timer: 1.5, cd: 0, aware: true, room: room?.id ?? 0, elite: true, tx: x, ty: y, phase: 0, patternCd: 2, patternIdx: 0, summoned: 0, alpha: 1, charmT: 0, xp: def.xp,
+    };
+    this.enemies.push(e);
+    this.bossEnt = e;
+    this.bossIntro = 2.5;
+    audio.play('boss'); this.shake = 14;
+    this.say(def.name, '#ff3050', true);
+    this.say(`“${def.phases[0].line}”`, '#e0d0c0');
+  }
+  devKillAll() { for (const e of this.enemies) if (!e.dead) this.killEnemy(e, false); }
+  devTeleport(where: 'exit' | 'boss' | 'secret' | 'start' | 'enemy') {
+    const f = this.floor;
+    let pt: { x: number; y: number } | undefined;
+    if (where === 'start') pt = f.start;
+    if (where === 'exit') { const pr = f.props.find((x) => x.kind === 'portal'); pt = pr ? { x: pr.x + 40, y: pr.y + 30 } : f.exit; }
+    if (where === 'boss' && f.bossRoom) pt = { x: (f.bossRoom.x + f.bossRoom.w / 2) * TILE, y: (f.bossRoom.y + f.bossRoom.h * 0.75) * TILE };
+    if (where === 'secret') { const r = f.rooms.find((x) => x.kind === 'secret'); if (r) pt = { x: (r.x + r.w / 2) * TILE, y: (r.y + r.h - 1.2) * TILE }; }
+    if (where === 'enemy') { const r = f.rooms.find((x) => !x.activated && x.kind !== 'secret'); if (r) pt = { x: (r.x + r.w / 2) * TILE, y: (r.y + r.h / 2) * TILE }; }
+    if (!pt) { this.say('Nowhere to go.', '#a08080'); return; }
+    this.p.x = pt.x; this.p.y = pt.y; this.camX = pt.x; this.camY = pt.y;
+    this.parts.push({ x: pt.x, y: pt.y - 12, vx: 0, vy: 0, life: 0.5, max: 0.5, size: 60, color: '#80c0ff', kind: 'ring' });
+  }
+  devHeal() { this.p.hp = this.stats.maxHp; this.p.blood = this.stats.maxBlood; this.p.frenzy = false; this.p.starveT = 0; this.statsDirty = true; }
+  devLoot(n: number, rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythical') {
+    for (let i = 0; i < n; i++) this.spawnPickup(this.p.x, this.p.y, 'item', 1, undefined, rollEquipment(this.rng, Math.max(this.level, 8), 3, rarity));
+  }
+  devGold(n: number) { for (let i = 0; i < 8; i++) this.spawnPickup(this.p.x, this.p.y, 'gold', Math.round(n / 8)); }
+  devFinishFloor() { if (this.finished) return; this.finished = true; this.flushMastery(); this.cfg.onEvent({ type: 'floorComplete', hp: this.p.hp, blood: this.p.blood }); }
+  devInfo() {
+    const room = roomAt(this.floor, this.p.x, this.p.y);
+    return { fps: this.fpsAcc.fps, enemies: this.enemies.filter((e) => !e.dead).length, particles: this.parts.length, projectiles: this.projs.length, x: Math.round(this.p.x), y: Math.round(this.p.y), room: room ? `${room.kind} #${room.id}` : 'corridor', floor: this.cfg.floor, boss: this.bossEnt && !this.bossEnt.dead ? (this.bossEnt.def as BossDef).name : null };
+  }
+
+  private renderHitboxes() {
+    const g = this.g, p = this.p;
+    g.lineWidth = 1;
+    g.strokeStyle = '#40ff80'; g.beginPath(); g.arc(p.x, p.y, p.r, 0, 7); g.stroke();
+    g.font = '9px monospace'; g.textAlign = 'center';
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      g.strokeStyle = e.aware ? '#ff4040' : '#ffd040'; g.beginPath(); g.arc(e.x, e.y, e.r, 0, 7); g.stroke();
+      g.fillStyle = '#ffffff'; g.fillText(`${e.ai} ${Math.ceil(e.hp)}/${Math.ceil(e.maxHp)}`, e.x, e.y + e.r + 22);
+    }
+    for (const a of this.allies) { g.strokeStyle = '#40a0ff'; g.beginPath(); g.arc(a.x, a.y, a.r, 0, 7); g.stroke(); }
+    for (const pr of this.projs) { g.strokeStyle = pr.team === 'p' ? '#80ff80' : '#ff8080'; g.beginPath(); g.arc(pr.x, pr.y, pr.r, 0, 7); g.stroke(); }
+    for (const r of this.floor.rooms) { g.strokeStyle = 'rgba(128,192,255,0.35)'; g.strokeRect(r.x * TILE, r.y * TILE, r.w * TILE, r.h * TILE); g.fillStyle = 'rgba(128,192,255,0.7)'; g.fillText(`${r.kind} #${r.id}`, (r.x + 1.5) * TILE, (r.y + 0.6) * TILE); }
+  }
+
   // ───────────────────────── Rendering ─────────────────────────
   private render() {
     const g = this.g, W = this.W, H = this.H, z = this.zoom, dpr = this.dpr;
@@ -1720,6 +1820,7 @@ export class Hunt {
       const gr = g.createRadialGradient(ox, oy, 0, ox, oy, 12); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.3, o.color); gr.addColorStop(1, hexA(o.color, 0));
       g.fillStyle = gr; g.beginPath(); g.arc(ox, oy, 12, 0, 7); g.fill();
     }
+    if (this.dv.hitboxes) this.renderHitboxes();
     g.restore();
 
     // Lighting
@@ -1991,6 +2092,11 @@ export class Hunt {
     }
     // Region / floor title + minimap
     this.renderMinimap();
+    if (this.dv.enabled) {
+      const flags = (['god', 'infBlood', 'noCooldowns', 'oneHit', 'noclip', 'invisible'] as const).filter((k) => this.dv[k]);
+      g.font = '600 10px monospace'; g.textAlign = 'left'; g.fillStyle = '#80c0ff';
+      g.fillText(`DEV${this.dv.fps ? ` · ${this.fpsAcc.fps} fps · ${this.enemies.filter((e) => !e.dead).length} foes · ${this.parts.length} fx` : ''}${flags.length ? ` · ${flags.join(' ')}` : ''}${this.dv.timeScale !== 1 ? ` · ×${this.dv.timeScale} time` : ''}`, 14, by + 84);
+    }
     // Boss bar
     const boss = this.bossEnt;
     if (boss && !boss.dead) {
@@ -2047,7 +2153,7 @@ export class Hunt {
     const mw = f.w * s, mh = f.h * s, x0 = W - mw - 48, y0 = 10;
     g.fillStyle = 'rgba(8,4,6,0.7)'; roundRect(g, x0 - 4, y0 - 4, mw + 8, mh + 8, 6); g.fill();
     for (const r of f.rooms) {
-      if (!this.visited.has(r.id) && !r.activated) continue;
+      if (!this.visited.has(r.id) && !r.activated && !this.dv.revealMap) continue;
       g.fillStyle = r.kind === 'boss' ? 'rgba(200,30,50,0.6)' : r.kind === 'exit' ? 'rgba(220,60,90,0.6)' : r.kind === 'secret' ? 'rgba(180,140,255,0.6)' : 'rgba(200,180,160,0.35)';
       g.fillRect(x0 + r.x * s, y0 + r.y * s, r.w * s, r.h * s);
     }
@@ -2084,7 +2190,7 @@ export class Hunt {
       }
       if (b.id === 'dash') cdK = Math.max(0, p.dashCd / 0.75);
       if (b.id === 'feed') { dim = !nearFeed; if (nearFeed) glow = '#ff2040'; }
-      if (b.id === 'form') { const f = FORM_BY_ID[this.cfg.state.heir.form]; cdK = p.formCd > 0 ? p.formCd / f.cooldown : 0; glow = p.form ? f.color : ''; ic = f.icon; dim = !formAvailable(this.cfg.state.heir, f); }
+      if (b.id === 'form') { const f = FORM_BY_ID[this.cfg.state.heir.form]; cdK = p.formCd > 0 ? p.formCd / f.cooldown : 0; glow = p.form ? f.color : ''; ic = f.icon; dim = !formAvailable(this.cfg.state.heir, f, this.dv.allForms); }
       if (b.id.startsWith('pot')) { const id = this.cfg.state.heir.belt[Number(b.id[3])]; if (!id) continue; dim = (this.cfg.state.consumables[id] ?? 0) <= 0; }
       const pressed = [...this.held.values()].includes(b.id);
       g.fillStyle = pressed ? 'rgba(120,20,40,0.75)' : 'rgba(14,8,10,0.62)';

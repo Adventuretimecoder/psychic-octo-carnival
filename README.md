@@ -35,6 +35,26 @@ It is single-player with persistent saves, so no backend is needed. That keeps i
 **Touch controls:** left thumb = move (floating stick); big button = attack (hold; auto-aims); ring of four = abilities; fangs = feed; mask = transform; small buttons = belt potions.
 **Keyboard:** WASD move · click/J attack · Space dash · Q E R F abilities · V feed · T transform · 1 2 potions · Esc pause.
 
+## Developer mode
+
+Turn it on in **Settings → Developer mode**. A wrench button appears in the Haven's top bar and in the top-left of every hunt. It opens a panel with 13 tabs:
+
+| Tab | What you can do |
+|---|---|
+| Cheats | God mode, infinite blood, no cooldowns, one-hit kills, no hunger, sun immunity, noclip, invisibility, reveal map, hitbox/AI overlay, FPS stats, all transformations, free crafting, unlimited court actions; sliders for game speed, damage, move speed, XP and drop rate; presets; "Unlock everything" |
+| Hunt | Launch any region at any floor (including straight into a boss lair). During a hunt: spawn any of the 50 creatures (count, elite) or any of the 12 bosses, kill all, teleport (start / next room / secret room / exit / boss), heal, rain loot or crowns, complete the floor, live engine stats |
+| Heir | Rename, titles, rank (bypassing trials), XP, attribute & skill points, every attribute by slider, vitae, purity, corruption, Path, full derived-stat readout |
+| Powers | Learn any or all 120+ abilities, set mastery (evolves them), equip any slot, pick any transformation |
+| Blood | Edit every gene (potency, dominant/recessive/dormant, stage), add or remove any bloodline, all 20 at Apotheosis, toggle mutations, add feeding records, and an inheritance simulator (500 children against any house) |
+| Items | Search-and-spawn any item at any upgrade level, bulk random gear by rarity, every item of a rarity, all relics and heirlooms, materials, vials, potions, perfect any item, add affixes, set crowns, prestige and research, learn all recipes, reset the market, forgive debts |
+| World | Set the night or skip nights, trigger/end any world event in any region, per-region owner, lord slain, population, defense, build everything; Council seat, pass/repeal any decree, court actions |
+| Houses | Standing and power sliders for all 20 houses, ally, exile, reveal secret, instant marriage |
+| Quests | Accept any quest ignoring requirements, complete instantly, accept everything, complete all active, wipe the log, set/clear story flags |
+| Lore | Unseal the codex, discover every secret, complete the bestiary, grant/reset achievements, edit any stats counter |
+| Dynasty | Rename the house and motto, patron, heir's maternal heritage, divorce, roll heirs and open succession, True Death, NPC regard, reset dialogue |
+| Console | 50+ text commands with history (↑/↓). Examples: `unlockall`, `rank 11`, `learn all`, `gene void 90`, `stage all`, `item starforged 10`, `loot 10 legendary`, `boss all`, `claim all`, `event blood-moon`, `marry noctharis`, `complete all`, `toggle god`, `set timeScale 0.3` — type `help` for the list |
+| Save | Raw JSON state editor (load, edit anything, apply), export/import save codes, turn developer mode off |
+
 ## What's in the game
 
 | System | Content |
@@ -60,7 +80,7 @@ It is single-player with persistent saves, so no backend is needed. That keeps i
 src/game/types.ts          Data schemas everything is authored against
 src/game/data/             All content (houses, bloodlines, abilities, creatures, …) + registry of IDs
 src/game/systems/          Pure game logic — stats, genetics, progression, quests, world (politics,
-                           territory, economy), crafting, loot, run handling, saves
+                           territory, economy), crafting, loot, run handling, saves, dev tools
 src/game/engine/           Canvas action engine: dungeon generation, procedural art & lighting,
                            synthesized audio, the Hunt (combat, AI, bosses, HUD, touch controls)
 src/ui/                    React + Tailwind interface

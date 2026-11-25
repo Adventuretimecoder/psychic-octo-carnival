@@ -30,7 +30,7 @@ export const maxCourtActions = (s: GameState) => 3 + (s.heir.rank >= 6 ? 1 : 0) 
 // ───────────────────────── Court actions ─────────────────────────
 export interface CourtResult { ok: boolean; msg: string }
 
-const spend = (s: GameState): boolean => { if (s.courtActions <= 0) return false; s.courtActions--; return true; };
+const spend = (s: GameState): boolean => { if (s.dev?.enabled && s.dev.freeCourt) return true; if (s.courtActions <= 0) return false; s.courtActions--; return true; };
 
 export const giftCost = (s: GameState, h: HouseId) => Math.round(80 * (1 + s.houses[h].power / 50));
 

@@ -21,8 +21,11 @@ export function haveInput(s: GameState, id: string): number {
   return (s.materials[id] ?? 0) + (s.consumables[id] ?? 0);
 }
 
+const freeCraft = (s: GameState) => !!s.dev?.enabled && s.dev.freeCrafting;
+
 export function canCraft(s: GameState, r: RecipeDef): string | null {
   if (!recipeKnown(s, r)) return 'Unknown recipe.';
+  if (freeCraft(s)) return null;
   for (const inp of r.inputs) if (haveInput(s, inp.id) < inp.count) return `Missing ${inputName(inp.id)}.`;
   if (s.gold < craftGold(s, r)) return 'Not enough crowns.';
   return null;
@@ -31,6 +34,7 @@ export function canCraft(s: GameState, r: RecipeDef): string | null {
 export const inputName = (id: string) => (id.startsWith('blood:') ? `${id.slice(6)} blood vial` : MATERIAL_BY_ID[id]?.name ?? ITEM_BY_ID[id]?.name ?? id);
 
 function consume(s: GameState, r: RecipeDef) {
+  if (freeCraft(s)) return;
   for (const inp of r.inputs) {
     if (inp.id.startsWith('blood:')) { const t = inp.id.slice(6) as BloodType; s.vials[t] = (s.vials[t] ?? 0) - inp.count; continue; }
     let left = inp.count;

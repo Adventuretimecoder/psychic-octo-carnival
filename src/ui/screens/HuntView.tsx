@@ -7,6 +7,7 @@ import { generateProgeny } from '../../game/systems/progression';
 import { applyHuntEvent, bankRun, descend, failRun, floorComplete } from '../../game/systems/run';
 import { save } from '../../game/systems/save';
 import { Btn, Icon, Modal } from '../components';
+import { DevPanel } from './DevPanel';
 import { useGame } from '../store';
 
 type Overlay = null | { kind: 'floor'; last: boolean } | { kind: 'pause' } | { kind: 'death'; cause: string };
@@ -17,6 +18,7 @@ export function HuntView() {
   const hunt = useRef<Hunt | null>(null);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [floorKey, setFloorKey] = useState(0);
+  const [devOpen, setDevOpen] = useState(false);
   const run = s.run;
 
   useEffect(() => {
@@ -63,6 +65,10 @@ export function HuntView() {
   return (
     <div className="fixed inset-0 bg-black">
       <canvas ref={ref} className="h-full w-full touch-none select-none" />
+      {s.dev?.enabled && !overlay && !devOpen && (
+        <button aria-label="Developer tools" onClick={() => { hunt.current?.setPaused(true); setDevOpen(true); }} className="absolute top-[118px] left-3 rounded border border-sky-300/50 bg-sky-950/70 p-1.5 text-sky-200"><Icon name="spanner" size={20} /></button>
+      )}
+      {devOpen && <DevPanel hunt={hunt.current} onClose={() => { setDevOpen(false); hunt.current?.setPaused(false); }} />}
       {overlay?.kind === 'pause' && (
         <Modal title="The Hunt Pauses" onClose={() => { setOverlay(null); hunt.current?.setPaused(false); }}>
           <RunSummary />

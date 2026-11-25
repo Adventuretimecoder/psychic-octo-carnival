@@ -111,6 +111,34 @@ export interface Dynasty {
   history: string[];
 }
 
+export interface DevFlags {
+  enabled: boolean;
+  god: boolean; // take no damage
+  infBlood: boolean; // blood never drains or runs out
+  noCooldowns: boolean;
+  oneHit: boolean; // every hit kills (bosses included)
+  noHunger: boolean;
+  noSun: boolean;
+  noclip: boolean; // walk through walls
+  invisible: boolean; // enemies never notice you
+  revealMap: boolean;
+  hitboxes: boolean; // draw collision circles & AI states
+  fps: boolean;
+  allForms: boolean; // every transformation unlocked
+  freeCrafting: boolean; // crafting ignores costs
+  freeCourt: boolean; // unlimited court actions
+  timeScale: number; // 0.1..3
+  dmgMul: number; // damage multiplier
+  speedMul: number; // move speed multiplier
+  xpMul: number;
+  lootMul: number;
+}
+
+export const DEFAULT_DEV: DevFlags = {
+  enabled: false, god: false, infBlood: false, noCooldowns: false, oneHit: false, noHunger: false, noSun: false, noclip: false, invisible: false,
+  revealMap: false, hitboxes: false, fps: false, allForms: false, freeCrafting: false, freeCourt: false, timeScale: 1, dmgMul: 1, speedMul: 1, xpMul: 1, lootMul: 1,
+};
+
 export interface RunState {
   region: string;
   floor: number;
@@ -166,4 +194,6 @@ export interface GameState {
   /** Unbanked loot of the hunt in progress. */
   run: RunState | null;
   settings: { sfx: number; music: number; shake: boolean; autoAim: boolean; damageNumbers: boolean };
+  /** Developer mode toggles (see systems/dev.ts). */
+  dev?: DevFlags;
 }

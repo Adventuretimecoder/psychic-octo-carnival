@@ -17,6 +17,7 @@ import { HeirScreen } from './Heir';
 import { Lore } from './Lore';
 import { Settings } from './Settings';
 import { WorldMap } from './WorldMap';
+import { DevPanel } from './DevPanel';
 
 type Tab = 'haven' | 'heir' | 'hunt' | 'court' | 'lore';
 
@@ -24,6 +25,7 @@ export function Haven() {
   const { s } = useGame();
   const [tab, setTab] = useState<Tab>('haven');
   const [settings, setSettings] = useState(false);
+  const [devOpen, setDevOpen] = useState(false);
   const readyQuests = s.quests.filter((q) => q.done).length;
   const nav: Array<{ id: Tab; label: string; icon: string; badge?: number }> = [
     { id: 'haven', label: 'Haven', icon: 'castle', badge: readyQuests },
@@ -34,7 +36,7 @@ export function Haven() {
   ];
   return (
     <div className="bg-haven flex h-full flex-col">
-      <TopBar onSettings={() => setSettings(true)} />
+      <TopBar onSettings={() => setSettings(true)} onDev={() => setDevOpen(true)} />
       <main className="flex-1 overflow-y-auto px-3 pt-3 pb-24">
         <div className="mx-auto max-w-3xl">
           {tab === 'haven' && <Overview go={setTab} />}
@@ -58,6 +60,7 @@ export function Haven() {
         </div>
       </nav>
       {settings && <Settings onClose={() => setSettings(false)} />}
+      {devOpen && <DevPanel onClose={() => setDevOpen(false)} />}
     </div>
   );
 }
@@ -70,7 +73,7 @@ function Crest({ s, size = 34 }: { s: GameState; size?: number }) {
   );
 }
 
-function TopBar({ onSettings }: { onSettings: () => void }) {
+function TopBar({ onSettings, onDev }: { onSettings: () => void; onDev: () => void }) {
   const { s } = useGame();
   return (
     <header className="safe-t sticky top-0 z-30 border-b border-gold/20 bg-[#0d0709]/95 backdrop-blur">
@@ -82,6 +85,7 @@ function TopBar({ onSettings }: { onSettings: () => void }) {
         </div>
         <div className="flex items-center gap-1 font-display text-sm text-amber-200"><Icon name="two-coins" size={16} color="#ffd050" />{s.gold.toLocaleString()}</div>
         <div className="flex items-center gap-1 font-display text-sm text-purple-200"><Icon name="laurel-crown" size={16} color="#c8a0ff" />{s.dynasty.prestige}</div>
+        {s.dev?.enabled && <button onClick={onDev} aria-label="Developer tools" className="rounded border border-sky-300/40 bg-sky-900/30 p-1 text-sky-200"><Icon name="spanner" size={18} /></button>}
         <button onClick={onSettings} aria-label="Settings" className="p-1 text-mist hover:text-parch"><Icon name="cog" size={20} /></button>
       </div>
       {s.events.length > 0 && (

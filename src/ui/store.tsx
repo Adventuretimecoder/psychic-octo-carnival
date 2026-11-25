@@ -43,8 +43,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const toast = useCallback((text: string | string[], tone?: Toast['tone']) => {
     const arr = (Array.isArray(text) ? text : [text]).filter(Boolean);
     if (!arr.length) return;
-    const add = arr.map((t) => ({ id: TID++, text: t, tone: tone ?? toneOf(t) }));
-    setToasts((old) => [...old, ...add].slice(-6));
+    let add = arr.map((t) => ({ id: TID++, text: t, tone: tone ?? toneOf(t) }));
+    // Bulk results (dev unlocks, many achievements at once) collapse into one summary.
+    if (add.length > 3) {
+      const ach = arr.filter((t) => t.startsWith('Achievement: '));
+      const rest = arr.filter((t) => !t.startsWith('Achievement: '));
+      const summary = ach.length ? [`${ach.length} achievements earned: ${ach.slice(0, 3).map((t) => t.replace('Achievement: ', '').replace(/ — .*$/, '').replace(/\.$/, '')).join(', ')}${ach.length > 3 ? '…' : '.'}`] : [];
+      const lines = [...rest.slice(0, 2), ...(rest.length > 2 ? [`…and ${rest.length - 2} more.`] : []), ...summary];
+      add = lines.map((t) => ({ id: TID++, text: t, tone: tone ?? toneOf(t) }));
+    }
+    setToasts((old) => [...old, ...add].slice(-4));
     for (const a of add) setTimeout(() => setToasts((old) => old.filter((x) => x.id !== a.id)), a.tone === 'epic' ? 7000 : 5000);
   }, []);
 
